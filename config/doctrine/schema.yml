@@ -1,0 +1,27 @@
+TwitterSearchPhrase:
+  columns:
+    phrase:             { type: string(140) }
+
+Tweet:
+  options:
+    symfony:
+      form:             false
+  actAs:
+    Timestampable:     ~
+    Geographical:      ~
+  columns:
+    tweet_id:          { type: string(22), notnull: true }  # as id of the tweet from twitter
+    twitter_user_id:   { type: integer(5), notnull: true }  # as twitter user id
+    screen_name:       { type: char(20), notnull: true }    # Username
+    display_name:      { type: char(50), notnull: true }    # Display name
+    profile_pic:       { type: text, notnull: true }        # Absolute URL to the profile pic
+    body:              { type: char(140), notnull: true }   # The tweet itself
+    processed:         { type: boolean, default: false }    # Boolean flag for whether the tweet's been processed
+  indexes:
+    tweet:
+      fields:    [ tweet_id ]
+      unique:    true
+    user:
+      fields:    [ twitter_user_id ]
+    name:
+      fields:    [ screen_name ]
