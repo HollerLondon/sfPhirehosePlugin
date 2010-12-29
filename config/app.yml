@@ -1,0 +1,7 @@
+all:
+  phirehose:
+    class:        sfPhirehose
+    username:     ~ # Username of your Twitter account
+    password:     ~ # Password of your Twitter account
+    follow:       ~ # Array of numeric Twitter User IDs to follow
+    track:        ~ # Array of phrases to track (will get merged with any from TwitterSearchTerms)

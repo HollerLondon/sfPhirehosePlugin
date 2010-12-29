@@ -18,26 +18,59 @@ abstract class PluginTweet extends BaseTweet
    * @see json_decode
    * @return Tweet object
    */
-  // static public function hydrateFromDecodedResponse($t)
-  // {
-  //   $tweet = new Tweet();
-  //   $tweet['tweet_id']        = $t->id                ? $t->id : false;
-  //   $tweet['twitter_user_id'] = $t->user->id          ? $t->user->id : false;
-  //   $tweet['screen_name']     = $t->user->screen_name ? $t->user->screen_name : false;
-  //   $tweet['body']            = $t->text              ? $t->text : false;
-  //   return $tweet;
-  // }
-
-  /**
-   * @see in_array
-   * @param string $k - the full URL string
-   * @param array $arr - the collection of allowed URLs
-   * @return boolean
-   */
-  static private function inArray($k,$arr)
+  static public function hydrateFromDecodedResponse($t)
   {
-    $url = parse_url($k);
-    return is_array($url) && array_key_exists('host', $url) && in_array($url['host'],$arr);
+    $tweet = new Tweet();
+    $tweet['guid']            = $t->id_str                   ? $t->id_str : false;
+    $tweet['twitter_user_id'] = $t->user->id                 ? $t->user->id : false;
+    $tweet['screen_name']     = $t->user->screen_name        ? $t->user->screen_name : false;
+    $tweet['display_name']    = $t->user->name               ? $t->user->name : false;
+    $tweet['profile_pic']     = $t->user->profile_image_url  ? $t->user->profile_image_url : false;
+    $tweet['body']            = $t->text                     ? $t->text : false;
+    self::processGeoData($t,$tweet);
+    return $tweet;
+  }
+
+  static public function processGeoData(stdClass $d, Tweet $tweet)
+  {
+    // Twitter gives us a bounding box, so work with the opposite corners to
+    // derive the centre point which is what we'll use for our geo properties
+    // The data looks something like this:
+    // array(
+    //   'type' => 'Polygon',
+    //   'coordinates' => array (
+    //     0 => 
+    //     array (
+    //       0 => 
+    //       array (
+    //         0 => -1.052995,
+    //         1 => 51.409779,
+    //       ),
+    //       1 => 
+    //       array (
+    //         0 => -0.928323,
+    //         1 => 51.409779,
+    //       ),
+    //       2 => 
+    //       array (
+    //         0 => -0.928323,
+    //         1 => 51.493078,
+    //       ),
+    //       3 => 
+    //       array (
+    //         0 => -1.052995,
+    //         1 => 51.493078,
+    //       ),
+    //     ),
+    //   ),
+    // )),
+    if(isset($d->place->bounding_box))
+    {
+      $box = $d->place->bounding_box->coordinates;
+      $tweet['latitude']  = ($box[0][0][1] + $box[0][2][1]) / 2;
+      $tweet['longitude'] = ($box[0][0][0] + $box[0][2][0]) / 2;
+    }
+    return $tweet;
   }
 
 }
