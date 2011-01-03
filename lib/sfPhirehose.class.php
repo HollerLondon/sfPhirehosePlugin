@@ -34,17 +34,24 @@ class sfPhirehose extends Phirehose
       $md_phrases = array($md_phrases);
     }
     
-    $phrases = array_merge($md_phrases,$this->phrases);
-    $this->setTrack($phrases);
+    return $md_phrases;
+  }
+  
+  protected function getFollows()
+  {
+    return sfConfig::get('app_phirehose_follow',array());
   }
   
   public function checkFilterPredicates()
   {
     $this->log("Checking search terms and users to follow");
-    $this->getSearchPhrases();
-    // exit(var_dump(sfConfig::get('app_phirehose_follow',array())));
+
+    $this->setTrack(
+      array_unique(array_merge($this->getSearchPhrases(),$this->phrases))
+    );
+
     $this->setFollow(
-      sfConfig::get('app_phirehose_follow',array())
+      array_unique(array_merge(sfConfig::get('app_phirehose_follow',array()),$this->getFollows()))
     );
   }
 

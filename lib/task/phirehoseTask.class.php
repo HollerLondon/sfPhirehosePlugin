@@ -84,13 +84,13 @@ EOF;
     // initialize the database connection
     $databaseManager = new sfDatabaseManager($this->configuration);
     $connection = $databaseManager->getDatabase($options['connection'])->getConnection();
+    
+    $class_name = sfConfig::get('app_phirehose_class','sfPhirehose');
 
     $this->logSection("DB","Established");
     
     $this->logSection("Phirehose","Attempting to create Streaming API connection");
-    $this->logSection("Phirehose",sprintf("Connecting as %s",sfConfig::get('app_phirehose_username')));
-    
-    $class_name = sfConfig::get('app_phirehose_class','sfPhirehose');
+    $this->logSection("Phirehose",sprintf("Connecting as %s using class %s",sfConfig::get('app_phirehose_username'),$class_name));
 
     $searcher = new $class_name(
       sfConfig::get('app_phirehose_username'),
