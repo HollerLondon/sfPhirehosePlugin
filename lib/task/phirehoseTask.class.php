@@ -109,14 +109,22 @@ EOF;
    */
   public function logSection($section, $message, $size = null, $style = 'INFO')
   {
-    if($section == 'Phirehose')
+    if($section == 'Phirehose' && sfConfig::get('app_phirehose_log_purge',86400) > 0)
     {
-	  	parent::logSection($section,$message);
       $l = new TaskLog;
       $l['message'] = $message;
       $l->save();
       $l->free(true);
+      
+      $q = Doctrine::getTable('TaskLog')
+        ->createQuery('t')
+        ->delete()
+        ->where('t.created_at < ?',date('Y-m-d H:i:s',strtotime(sprintf("-%u second",sfConfig::get('app_phirehose_log_purge',86400)))));
+      
+      parent::logSection("debug","Purging logs older than ".date('Y-m-d H:i:s',strtotime(sprintf("-%u second",sfConfig::get('app_phirehose_log_purge',86400)))));
+      $q->execute();
+      
     }
-    else return parent::logSection($section,$message,$size,$style);
+    return parent::logSection($section,$message,$size,$style);
   }
 }
