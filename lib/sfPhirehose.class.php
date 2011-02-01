@@ -21,6 +21,12 @@ class sfPhirehose extends Phirehose
     return parent::__construct($username, $password, $method, $format);
   }
 
+  /**
+   * Get the search phrases to search against
+   *
+   * @return array
+   * @author Ben Lancaster
+   **/
   protected function getSearchPhrases()
   {
     // This'll give us a multidimensional array, which is well annoying
@@ -37,11 +43,27 @@ class sfPhirehose extends Phirehose
     return $md_phrases;
   }
   
+  /**
+   * Spits out an array of numeric twitter user ids of the users whose tweets
+   * we'll be following
+   *
+   * @return array
+   * @author Ben Lancaster
+   **/
   protected function getFollows()
   {
     return sfConfig::get('app_phirehose_follow',array());
   }
   
+  /**
+   * Phirehose calls this method periodically, which sets the search terms to 
+   * track and the users to follow from self::getFollows() and
+   * self::getSearchPhrases()
+   *
+   * @return void
+   * @see self::getSearchPhrases(), self:::getFollows()
+   * @author Ben Lancaster
+   **/
   public function checkFilterPredicates()
   {
     $this->log("Checking search terms and users to follow");
@@ -55,6 +77,13 @@ class sfPhirehose extends Phirehose
     );
   }
 
+  /**
+   * Takes a raw JSON-serialised Tweet from the Twitter Firehose and creates a 
+   * new Doctrine Tweet object from it
+   *
+   * @return void
+   * @author Ben Lancaster
+   **/
   public function enqueueStatus($raw)
   {
     try
@@ -71,12 +100,15 @@ class sfPhirehose extends Phirehose
           ->execute();
         $this->log("Deleted tweet with id %s",$data->delete->status->id_str);
       }
+
+      // If we're consuming too much too quickly, Twitter will tell us
       elseif(isset($data->limit))
       {
         $this->log(sprintf("%u status(es) have been rate-limited"),
           $data->limit
         );
       }
+
       // Get rid of any geo data as requested by Twitter
       elseif(isset($data->scrub_geo))
       {
@@ -95,7 +127,7 @@ class sfPhirehose extends Phirehose
         // Create a new Tweet object from the JSON data
         $tweet = Tweet::hydrateFromDecodedResponse($data);
         $tweet->save();
-        $tweet->free();
+        $tweet->free(); // this helps minimise memory leakage.
       }
     }
     catch(Exception $e)

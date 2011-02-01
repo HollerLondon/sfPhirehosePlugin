@@ -85,10 +85,16 @@ EOF;
     $databaseManager = new sfDatabaseManager($this->configuration);
     $connection = $databaseManager->getDatabase($options['connection'])->getConnection();
     
+    // This task doesn't actually do a whole lot. It's this class that really
+    // does the magic. The sfPhirehose class is an extension of the core
+    // Phirehose task. If you want to add your own logic for:
+    // - Fetching search terms
+    // - Fetching users to follow
+    // - Storing tweets
+    // ... then this is the class to overload
     $class_name = sfConfig::get('app_phirehose_class','sfPhirehose');
 
     $this->logSection("DB","Established");
-    
     $this->logSection("Phirehose","Attempting to create Streaming API connection");
     $this->logSection("Phirehose",sprintf("Connecting as %s using class %s",sfConfig::get('app_phirehose_username'),$class_name));
 
@@ -100,6 +106,9 @@ EOF;
     
     $this->logSection("Phirehose","Streaming API connection established");
 
+    // We pass the task back in to the sfPhirehose task so we can log stuff
+    // from it and have it logged by the task. That sounds cyclical and probably
+    // doesn't make a lot of sense. Give a shit.
     $searcher->task = $this;
     $searcher->consume();
   }
