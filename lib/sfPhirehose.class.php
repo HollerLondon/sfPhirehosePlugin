@@ -17,7 +17,7 @@ class sfPhirehose extends Phirehose
    **/
   public function __construct($username, $password, $method = Phirehose::METHOD_SAMPLE, $format = self::FORMAT_JSON)
   {
-    $this->phrases = sfConfig::get('app_phirehose_track');
+    $this->phrases = sfConfig::get('app_phirehose_track', array());
     return parent::__construct($username, $password, $method, $format);
   }
 
