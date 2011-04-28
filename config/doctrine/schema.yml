@@ -29,6 +29,12 @@ Tweet:
       fields:    [ twitter_user_id ]
     name:
       fields:    [ screen_name ]
+    processed:
+      fields:    [ processed ]
+    created_at:
+      fields:    [ created_at ]
+    updated_at:
+      fields:    [ updated_at ]
 
 TaskLog:
   actAs:
