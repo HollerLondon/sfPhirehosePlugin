@@ -30,12 +30,12 @@ class sfPhirehose extends Phirehose
   protected function getSearchPhrases()
   {
     // This'll give us a multidimensional array, which is well annoying
-    $md_phrases = Doctrine::getTable('TwitterSearchPhrase')
+    $md_phrases = TwitterSearchPhraseTable::getInstance()
                 ->createQuery('s')
                 ->select('s.phrase AS phrase')
                 ->execute(null,Doctrine::HYDRATE_SINGLE_SCALAR);
     
-    if(!is_array($md_phrases))
+    if (!is_array($md_phrases))
     {
       $md_phrases = array($md_phrases);
     }
@@ -52,7 +52,7 @@ class sfPhirehose extends Phirehose
    **/
   protected function getFollows()
   {
-    return sfConfig::get('app_phirehose_follow',array());
+    return sfConfig::get('app_phirehose_follow', array());
   }
   
   /**
@@ -78,69 +78,32 @@ class sfPhirehose extends Phirehose
   }
 
   /**
-   * Takes a raw JSON-serialised Tweet from the Twitter Firehose and creates a 
-   * new Doctrine Tweet object from it
+   * Takes a raw JSON-serialised Tweet from the Twitter Firehose and
+   * sends it to Beanstalk to process
    *
    * @return void
    * @author Ben Lancaster
    **/
   public function enqueueStatus($raw)
   {
-    try
+    $data = json_decode($raw, true);
+    
+    // If we're consuming too much too quickly, Twitter will tell us
+    if (isset($data['limit']))
     {
-      $data = json_decode($raw);
-      
-      // Delete tweets as requested by twitter
-      if(isset($data->delete) && isset($data->delete->status))
-      {
-        Doctrine::getTable('Tweet')
-          ->createQuery('t')
-          ->delete()
-          ->where('guid = ?',$data->delete->status->id_str)
-          ->execute();
-        $this->log("Deleted tweet with id %s",$data->delete->status->id_str);
-      }
-
-      // If we're consuming too much too quickly, Twitter will tell us
-      elseif(isset($data->limit))
-      {
-        $this->log(sprintf("%u status(es) have been rate-limited"),
-          $data->limit
-        );
-      }
-
-      // Get rid of any geo data as requested by Twitter
-      elseif(isset($data->scrub_geo))
-      {
-        Doctrine::getTable('Tweet')
-          ->createQuery('t')
-          ->update()
-          ->set('t.latitude','NULL')
-          ->set('t.longitude','NULL')
-          ->where('t.twitter_user_id = ?',$data->scrub_geo->user_id)
-          ->andWhere('t.latitude IS NOT NULL')
-          ->execute();
-        $this->log("Scrubbed geodata for user %s",$data->scrub_geo->user_id);
-      }
-      else
-      {
-        // Create a new Tweet object from the JSON data
-        $tweet = Tweet::hydrateFromDecodedResponse($data);
-        $tweet->save();
-        $tweet->free(); // this helps minimise memory leakage.
-      }
+      $this->log(sprintf("%u status(es) have been rate-limited"), $data['limit']['track']);
     }
-    catch(Exception $e)
+    else
     {
-      $this->task->logSection(get_class($e),
-        sprintf("%s on line %u of %s",$e->getMessage(),$e->getLine(),$e->getFile())
-      );
+      // Let beanstalk handle this work
+      $pheanstalk = majaxPheanstalk::getInstance();
+      $pheanstalk->useTube('tweets')->put($raw);
     }
   }
 
   public function log($msg)
   {
-    $this->task->logSection('Phirehose',$msg);
+    $this->task->logSection('Phirehose', $msg);
     $this->task->logSection('Memory',
       sprintf("Usage: %uM (current), %uM (peak)",
         round(memory_get_usage() / 1024 / 1024),

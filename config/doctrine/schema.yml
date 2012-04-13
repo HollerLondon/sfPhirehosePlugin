@@ -1,48 +1,245 @@
 TwitterSearchPhrase:
   columns:
     phrase:             { type: string(140) }
+    
   indexes:
     phrase:
       fields:    [ phrase ]
       unique:    true
 
+
+TwitterUserSkeleton:
+  columns:
+    id:                           { type: integer, unsigned: true, notnull: true, fixed: true }
+    screen_name:                  string(16)
+    name:                         string(50)
+    profile_background_tile:      string
+    protected:                    boolean
+    verified:                     boolean
+    profile_sidebar_fill_color:   { type: string(6), fixed: true }
+    profile_sidebar_border_color: { type: string(6), fixed: true }
+    profile_image_url:            string
+    profile_background_image_url: string
+    profile_background_color:     { type: string(6), fixed: true }
+    profile_link_color:           { type: string(6), fixed: true }
+    profile_text_color:           { type: string(6), fixed: true }
+    lang:                         { type: string(2), fixed: true }
+    time_zone:                    string(20)
+    utc_offset:                   { type: integer, unsigned: false }
+    geo_enabled:                  boolean
+    description:                  string(160)
+    friends_count:                integer
+    followers_count:              integer
+    
+  actAs:
+    Timestampable:                ~
+    
+  indexes:
+    user:
+      fields:         [ id, screen_name ]
+      type:           unique
+
+
+Hashtag:
+  options:
+    symfony:
+      form:             false
+      
+  columns:
+    hashtag:                string(140)
+    hash:                   { type: string(40), fixed: true }
+    track:                  { type: boolean, default: false }
+    
+  indexes:
+    hashed_hashtag:
+      fields:               [ hash ]
+      type:                 unique
+    track_hashtag:
+      fields:               [ track ]
+      
+  actAs:
+    Timestampable:
+      updated:              { disabled: true }
+
+
+TweetHashtag:
+  options:
+    symfony:
+      form:   false
+      filter: false
+      
+  columns:
+    tweet_id:               { type: integer, unsigned: true, notnull: true, fixed: true }
+    hashtag_id:             integer
+
+
+TweetLink:
+  options:
+    symfony:
+      form:   false
+      filter: false
+      
+  columns:
+    tweet_id:               { type: integer, unsigned: true, notnull: true, fixed: true }
+    link_id:                integer
+
+
+Link:
+  options:
+    symfony:
+      form:   false
+      
+  columns:
+    url:                    string
+    display_url:            string
+    expanded_url:           string
+    hash:                   { type: string(40), fixed: true }
+    
+  actAs:
+    Timestampable:
+      updated:              { disabled: true }
+      
+  indexes:
+    url_hash:
+      fields:               [ hash ]
+      type:                 unique
+    link_created_at:
+      fields:               [ created_at ]
+
+
+TweetSource:
+  columns:
+    source:                 text
+    hash:                   { type: string(40), fixed: true }
+    
+  indexes:
+    source_hash:
+      fields:               [ hash ]
+      type:                 unique
+      
+  options:
+    symfony:
+      form:             false
+
+
 Tweet:
   options:
     symfony:
       form:             false
+      
   actAs:
     Timestampable:     ~
-    Geographical:      ~
+    
   columns:
-    guid:              { type: string(22), notnull: true }  # as id of the tweet from twitter
-    twitter_user_id:   { type: integer(5), notnull: true }  # as twitter user id
-    screen_name:       { type: char(20), notnull: true }    # Username
-    display_name:      { type: char(50), notnull: true }    # Display name
-    profile_pic:       { type: text, notnull: true }        # Absolute URL to the profile pic
-    body:              { type: char(140), notnull: true }   # The tweet itself
-    processed:         { type: boolean, default: false }    # Boolean flag for whether the tweet's been processed
+    id:                     { type: integer, unsigned: true, notnull: true, primary: true, fixed: true }
+    text:                   { type: string(140), fixed: true }
+    in_reply_to_user_id:    integer
+    in_reply_to_status_id:  { type: integer, unsigned: true, notnull: false, fixed: true }
+    retweet_count:          integer
+    retweeted:              boolean
+    favorited:              boolean
+    truncated:              boolean
+    user_id:                integer
+    source_id:              integer
+    place_id:               { type: string(20), fixed: true }
+    twitter_id:             integer
+  
   indexes:
-    tweet:
-      fields:    [ guid ]
-      unique:    true
-    user:
-      fields:    [ twitter_user_id ]
-    name:
-      fields:    [ screen_name ]
-    processed:
-      fields:    [ processed ]
-    created_at:
-      fields:    [ created_at ]
-    updated_at:
-      fields:    [ updated_at ]
+    tweet_text:
+      fields:               [ text ]
+            
+  relations:
+    Author:
+      alias:                Author
+      local:                user_id
+      foreign:              id
+      class:                TwitterUserSkeleton
+      type:                 one
+      foreignType:          many
+    InReplyTo:
+      local:                in_reply_to_status_id
+      foreign:              id
+      type:                 one
+      class:                Tweet
+      foreignAlias:         Replies
+    Hashtags:
+      class:                Hashtag
+      refClass:             TweetHashtag
+      local:                tweet_id
+      foreign:              hashtag_id
+      onDelete:             cascade
+    Source:
+      class:                TweetSource
+      local:                source_id
+      foreign:              id
+    URLs:
+      class:                Link
+      refClass:             TweetLink
+      local:                tweet_id
+      foreign:              link_id
+      onDelete:             cascade
+    RetweetedBy:
+      class:                TwitterUserSkeleton
+      refClass:             Retweet
+      local:                tweet_id
+      foreign:              retweeter_id
+      alias:                RetweetedBy
+      foreignAlias:         Retweets
+    Mentions:
+      class:                TwitterUserSkeleton
+      refClass:             TweetMention
+      local:                tweet_id
+      foreign:              follower_id
+      alias:                Mentions
+      foreignAlias:         MentionedIn
+
+
+Retweet:
+  options:
+    symfony:
+      filter: false
+      form:   false
+      
+  columns:
+    tweet_id:               { type: integer, unsigned: true, notnull: true, primary: true, fixed: true }
+    retweeter_id:           { type: integer, primary: true }
+    
+  relations:
+    Tweet:
+      foreignAlias:         Retweets
+      
+  actAs:
+    Timestampable:
+      updated:              { disabled: true }
+      
+  indexes:
+    retweet:
+      fields:               [ tweet_id, retweeter_id ]
+      type:                 unique
+    retweeted_at:
+      fields:               [ created_at ]
+
+
+TweetMention:
+  columns:
+    tweet_id:               { type: integer, unsigned: true, notnull: true, primary: true, fixed: true }
+    follower_id:            { type: integer, primary: true }
+    
+  options:
+    symfony:
+      form:             false
+      filter:           false
+
 
 TaskLog:
   actAs:
     Timestampable:
-      updated:
-        disabled: true
+      updated:          { disabled: true }
+        
   options:
     symfony:
       form:             false
+      filter:           false
+      
   columns:
-    message: { type: text, notnull: true }
+    message:            { type: text, notnull: true }

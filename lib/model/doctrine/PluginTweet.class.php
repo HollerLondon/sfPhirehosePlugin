@@ -12,65 +12,134 @@
  */
 abstract class PluginTweet extends BaseTweet
 {
-  /**
-   * creates Tweet object from std object
-   * @param Standard Object $t - object retrieved from json_decode
-   * @see json_decode
-   * @return Tweet object
-   */
-  static public function hydrateFromDecodedResponse($t)
+/**
+   * Extension of BaseTweet to properly handle some (pretty 'kin complex) relations
+   * 
+   * @param array $array
+   * @param boolean $deep
+   */  
+  public function fromArray(array $array, $deep = true)
   {
-    $tweet = new Tweet();
-    $tweet['guid']            = $t->id_str                   ? $t->id_str : false;
-    $tweet['twitter_user_id'] = $t->user->id                 ? $t->user->id : false;
-    $tweet['screen_name']     = $t->user->screen_name        ? $t->user->screen_name : false;
-    $tweet['display_name']    = $t->user->name               ? $t->user->name : false;
-    $tweet['profile_pic']     = $t->user->profile_image_url  ? $t->user->profile_image_url : false;
-    $tweet['body']            = $t->text                     ? $t->text : false;
-    self::processGeoData($t,$tweet);
-    return $tweet;
-  }
+    // Need to clean the input up a bit to work around:
+    //  - incoming timestamps that don't match the format we're expecting
+    //  - massive integers that PHP can't handle
+    $array['created_at']            = date('Y-m-d H:i:s', strtotime($array['created_at']));
+    $array['id']                    = $array['id_str'];
+    $array['in_reply_to_status_id'] = $array['in_reply_to_status_id_str'];
 
-  static public function processGeoData(stdClass $d, Tweet $tweet)
-  {
-    // Twitter gives us a bounding box, so work with the opposite corners to
-    // derive the centre point which is what we'll use for our geo properties
-    // The data looks something like this:
-    // array(
-    //   'type' => 'Polygon',
-    //   'coordinates' => array (
-    //     0 => 
-    //     array (
-    //       0 => 
-    //       array (
-    //         0 => -1.052995,
-    //         1 => 51.409779,
-    //       ),
-    //       1 => 
-    //       array (
-    //         0 => -0.928323,
-    //         1 => 51.409779,
-    //       ),
-    //       2 => 
-    //       array (
-    //         0 => -0.928323,
-    //         1 => 51.493078,
-    //       ),
-    //       3 => 
-    //       array (
-    //         0 => -1.052995,
-    //         1 => 51.493078,
-    //       ),
-    //     ),
-    //   ),
-    // )),
-    if(isset($d->place->bounding_box))
+    parent::fromArray($array, $deep);
+    
+    // No point storing all the complex place stuff that comes in, so let's
+    // just grab the ID which we can get from Twitter with:
+    // http://api.twitter.com/1/geo/id/%PLACE_ID%.json
+    if (is_array($array['place']) && array_key_exists('id', $array['place']))
     {
-      $box = $d->place->bounding_box->coordinates;
-      $tweet['latitude']  = ($box[0][0][1] + $box[0][2][1]) / 2;
-      $tweet['longitude'] = ($box[0][0][0] + $box[0][2][0]) / 2;
+      $this['place_id'] = $array['place']['id'];
     }
-    return $tweet;
+
+    // don't do all this stuff if we're not hydrating deeply
+    if ($deep)
+    {
+      // Find or create a new Author for this tweet
+      $author = TwitterUserSkeletonTable::getInstance()->findOneById($array['user']['id']) ?: new TwitterUserSkeleton();
+      
+      // Save the user data as we have it here!
+      if ($author->isNew() || !$author->screen_name) 
+      {
+        $array['user']['created_at'] = date('Y-m-d H:i:s',strtotime($array['user']['created_at']));
+        $author->fromArray($array['user']);
+        $author->save(); // Need to save them incase they're also mentioned
+      }
+      
+      $this['Author'] = $author;
+  
+      // Tweet is in reply to something?
+      if (!is_null($array['in_reply_to_status_id']))
+      {
+        $in_reply_to = TweetTable::getInstance()->findOneById($array['in_reply_to_status_id']) ?: new Tweet();
+        
+        if ($in_reply_to->isNew()) $in_reply_to->setId($array['in_reply_to_status_id']);
+        $in_reply_to->save();
+        
+        $this['InReplyTo'] = $in_reply_to;
+      }
+      
+      // Mentions
+      foreach ($array['entities']['user_mentions'] as $usr)
+      {
+        $tw_usr = TwitterUserSkeletonTable::getInstance()->findOneById($usr->id) ?: new TwitterUserSkeleton();
+        $tw_usr->fromArray((array)$usr);
+        $tw_usr->save(); // need to save them incase they're also the author
+        
+        $this['Mentions']->add($tw_usr);
+      }
+      
+      // Hashtags
+      $seen = array();
+      
+      foreach ($array['entities']['hashtags'] as $ht)
+      {
+        $normalised_ht = strtolower($ht->text);
+        
+        if (in_array($normalised_ht, $seen)) continue;
+        
+        $seen[]             = $normalised_ht;
+        $hashtag            = HashtagTable::getInstance()->findOneByHashtag($normalised_ht) ?: new Hashtag();
+        $hashtag['hashtag'] = $normalised_ht;
+        
+        $this['Hashtags']->add($hashtag);
+      }
+      
+      // Source (aka Twitter client)
+      $source = TweetSourceTable::getInstance()->findOneBySource($array['source']) ?: new TweetSource();
+      
+      if ($source->isNew()) $source->setSource($array['source']);
+      
+      $this['Source'] = $source;
+      
+      // URLs in the tweet
+      foreach ($array['entities']['urls'] as $url)
+      {
+        $link = LinkTable::getInstance()->findOneByUrl($url->url) ?: new Link();
+        
+        if ($link->isNew())
+        {
+          $link->fromArray((array) $url); 
+          $link->save();
+        }
+        
+        $this['URLs']->add($link);
+      }
+    }
+  }
+  
+  public function getNbReplies()
+  {
+    return $this->createQuery()
+            ->select('COUNT(id)')
+            ->where('in_reply_to_status_id = ?',$this['id'])
+            ->fetchOne(null,Doctrine_Core::HYDRATE_SINGLE_SCALAR);
   }
 
+  public function getNbRetweets()
+  {
+    return RetweetTable::getInstance()
+                ->createQuery()
+                ->select('COUNT(tweet_id)')
+                ->where('tweet_id = ?',$this['id'])
+                ->fetchOne(null,Doctrine_Core::HYDRATE_SINGLE_SCALAR);
+  }
+
+  public function setInReplyToStatusId($status_id)
+  {
+    if (!$status_id) return;
+    if ($status_id instanceof Tweet)
+    {
+      return $this->setInReplyToStatusId($status_id['id']);
+    }
+
+    $in_reply_to = $this->getTable()->findOneById($status_id);
+
+    if ($in_reply_to) parent::_set('in_reply_to_status_id', $status_id);
+  }
 }
