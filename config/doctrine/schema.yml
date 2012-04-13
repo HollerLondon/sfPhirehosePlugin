@@ -10,7 +10,7 @@ TwitterSearchPhrase:
 
 TwitterUserSkeleton:
   columns:
-    id:                           { type: integer, unsigned: true, notnull: true, fixed: true }
+    id:                           { type: integer, unsigned: true, notnull: true, fixed: true, primary: true }
     screen_name:                  string(16)
     name:                         string(50)
     profile_background_tile:      string
@@ -69,19 +69,8 @@ TweetHashtag:
       filter: false
       
   columns:
-    tweet_id:               { type: integer, unsigned: true, notnull: true, fixed: true }
-    hashtag_id:             integer
-
-
-TweetLink:
-  options:
-    symfony:
-      form:   false
-      filter: false
-      
-  columns:
-    tweet_id:               { type: integer, unsigned: true, notnull: true, fixed: true }
-    link_id:                integer
+    tweet_id:               { type: integer, unsigned: true, notnull: true, fixed: true, primary: true }
+    hashtag_id:             { type: integer, primary: true }
 
 
 Link:
@@ -105,6 +94,17 @@ Link:
       type:                 unique
     link_created_at:
       fields:               [ created_at ]
+
+
+TweetLink:
+  options:
+    symfony:
+      form:   false
+      filter: false
+      
+  columns:
+    tweet_id:               { type: integer, unsigned: true, notnull: true, fixed: true, primary: true }
+    link_id:                { type: integer, primary: true }
 
 
 TweetSource:
@@ -133,13 +133,13 @@ Tweet:
   columns:
     id:                     { type: integer, unsigned: true, notnull: true, primary: true, fixed: true }
     text:                   { type: string(140), fixed: true }
-    in_reply_to_user_id:    integer
+    in_reply_to_user_id:    { type: integer, unsigned: true, notnull: false, fixed: true }
     in_reply_to_status_id:  { type: integer, unsigned: true, notnull: false, fixed: true }
     retweet_count:          integer
     retweeted:              boolean
     favorited:              boolean
     truncated:              boolean
-    user_id:                integer
+    user_id:                { type: integer, unsigned: true, notnull: false, fixed: true }
     source_id:              integer
     place_id:               { type: string(20), fixed: true }
     twitter_id:             integer
@@ -202,7 +202,7 @@ Retweet:
       
   columns:
     tweet_id:               { type: integer, unsigned: true, notnull: true, primary: true, fixed: true }
-    retweeter_id:           { type: integer, primary: true }
+    retweeter_id:           { type: integer, unsigned: true, notnull: true, primary: true, fixed: true }
     
   relations:
     Tweet:
@@ -223,7 +223,7 @@ Retweet:
 TweetMention:
   columns:
     tweet_id:               { type: integer, unsigned: true, notnull: true, primary: true, fixed: true }
-    follower_id:            { type: integer, primary: true }
+    follower_id:            { type: integer, unsigned: true, notnull: true, primary: true, fixed: true }
     
   options:
     symfony:
