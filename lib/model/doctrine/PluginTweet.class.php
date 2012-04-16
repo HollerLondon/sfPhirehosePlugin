@@ -43,13 +43,10 @@ abstract class PluginTweet extends BaseTweet
       // Find or create a new Author for this tweet
       $author = TwitterUserSkeletonTable::getInstance()->findOneById($array['user']['id']) ?: new TwitterUserSkeleton();
       
-      // Save the user data as we have it here!
-      if ($author->isNew() || !$author->screen_name) 
-      {
-        $array['user']['created_at'] = date('Y-m-d H:i:s',strtotime($array['user']['created_at']));
-        $author->fromArray($array['user']);
-        $author->save(); // Need to save them incase they're also mentioned
-      }
+      // Save the user data as we have it here! (this will update if needed)
+      $array['user']['created_at'] = date('Y-m-d H:i:s',strtotime($array['user']['created_at']));
+      $author->fromArray($array['user']);
+      $author->save(); // Need to save them incase they're also mentioned
       
       $this['Author'] = $author;
   
