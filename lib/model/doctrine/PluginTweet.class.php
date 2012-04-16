@@ -67,7 +67,7 @@ abstract class PluginTweet extends BaseTweet
       // Mentions
       foreach ($array['entities']['user_mentions'] as $usr)
       {
-        $tw_usr = TwitterUserSkeletonTable::getInstance()->findOneById($usr->id) ?: new TwitterUserSkeleton();
+        $tw_usr = TwitterUserSkeletonTable::getInstance()->findOneById($usr['id']) ?: new TwitterUserSkeleton();
         $tw_usr->fromArray((array)$usr);
         $tw_usr->save(); // need to save them incase they're also the author
         

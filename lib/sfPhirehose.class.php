@@ -101,7 +101,7 @@ class sfPhirehose extends Phirehose
     }
   }
 
-  public function log($msg)
+  public function log($msg, $level='notice')
   {
     $this->task->logSection('Phirehose', $msg);
     $this->task->logSection('Memory',
