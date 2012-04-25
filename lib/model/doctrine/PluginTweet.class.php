@@ -61,6 +61,8 @@ abstract class PluginTweet extends BaseTweet
         $this['InReplyTo'] = $in_reply_to;
       }
       
+      $mentions = array();
+      
       // Mentions
       foreach ($array['entities']['user_mentions'] as $usr)
       {
@@ -68,7 +70,14 @@ abstract class PluginTweet extends BaseTweet
         $tw_usr->fromArray((array)$usr);
         $tw_usr->save(); // need to save them incase they're also the author
         
-        $this['Mentions']->add($tw_usr);
+        // Don't want to duplicate - throws unique index error
+        if (!in_array($usr->id, $mentions))
+        {
+          $mentionned = TweetMentionTable::getInstance()->findOneByTweetIdAndFollowerId((int)$array['id'], $usr->id);
+          
+          if (!$mentionned) $this['Mentions']->add($tw_usr);
+          $mentions[] = $usr->id;
+        }
       }
       
       // Hashtags
