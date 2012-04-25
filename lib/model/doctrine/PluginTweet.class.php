@@ -73,10 +73,10 @@ abstract class PluginTweet extends BaseTweet
         // Don't want to duplicate - throws unique index error
         if (!in_array($usr->id, $mentions))
         {
+          $mentions[] = $usr->id;
           $mentionned = TweetMentionTable::getInstance()->findOneByTweetIdAndFollowerId((int)$array['id'], $usr->id);
           
           if (!$mentionned) $this['Mentions']->add($tw_usr);
-          $mentions[] = $usr->id;
         }
       }
       
@@ -92,6 +92,12 @@ abstract class PluginTweet extends BaseTweet
         $seen[]             = $normalised_ht;
         $hashtag            = HashtagTable::getInstance()->findOneByHashtag($normalised_ht) ?: new Hashtag();
         $hashtag['hashtag'] = $normalised_ht;
+        
+        if (!$hashtag->isNew())
+        {
+          $hashed = TweetHashtagTable::getInstance()->findOneByTweetIdAndHashtagId((int)$array['id'], $hashtag['id']);
+          if ($hashed) continue;
+        }
         
         $this['Hashtags']->add($hashtag);
       }
@@ -112,6 +118,11 @@ abstract class PluginTweet extends BaseTweet
         {
           $link->fromArray((array) $url); 
           $link->save();
+        }
+        else
+        {
+          $linked = TweetLinkTable::getInstance()->findOneByTweetIdAndLinkId((int)$array['id'], $link['id']);
+          if ($linked) continue;
         }
         
         $this['URLs']->add($link);
