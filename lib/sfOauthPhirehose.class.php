@@ -1,12 +1,10 @@
 <?php
-
 /**
- * This class has been deprecated in favour of using OAuth.
+ * Uses OAuth with the Twitter Phirehose streaming API
  * 
- * @deprecated
- *
+ * @author Jo Carter
  */
-class sfPhirehose extends Phirehose
+class sfOauthPhirehose extends OauthPhirehose
 {
   public  $task;
   
@@ -16,15 +14,18 @@ class sfPhirehose extends Phirehose
    * Overload and extend Phirehose's constructor to also hydrate the 
    * ResidentCollection and store it as an object property
    *
-   * @param string $username Twitter API User
-   * @param string $password Twitter API Password
+   * @param string $username Twitter API User (will be null)
+   * @param string $password Twitter API Password (will be  null)
    * @param const Phirehose::METHOD_*
    * @param const Phirehose::FORMAT_*
    * @return null
    **/
   public function __construct($username, $password, $method = Phirehose::METHOD_SAMPLE, $format = self::FORMAT_JSON)
   {
-    $this->phrases = sfConfig::get('app_phirehose_track', array());
+    $this->phrases        = sfConfig::get('app_phirehose_track', array());
+    $this->consumerKey    = sfConfig::get('app_phirehose_consumer_key');
+    $this->consumerSecret = sfConfig::get('app_phirehose_consumer_secret');
+    
     return parent::__construct($username, $password, $method, $format);
   }
 
@@ -38,9 +39,9 @@ class sfPhirehose extends Phirehose
   {
     // This'll give us a multidimensional array, which is well annoying
     $md_phrases = TwitterSearchPhraseTable::getInstance()
-                ->createQuery('s')
-                ->select('s.phrase AS phrase')
-                ->execute(null,Doctrine::HYDRATE_SINGLE_SCALAR);
+                                            ->createQuery('s')
+                                            ->select('s.phrase AS phrase')
+                                            ->execute(null,Doctrine::HYDRATE_SINGLE_SCALAR);
     
     if (!is_array($md_phrases))
     {
@@ -76,11 +77,11 @@ class sfPhirehose extends Phirehose
     $this->log("Checking search terms and users to follow");
 
     $this->setTrack(
-      array_unique(array_merge($this->getSearchPhrases(),$this->phrases))
+      array_unique(array_merge($this->getSearchPhrases(), $this->phrases))
     );
 
     $this->setFollow(
-      array_unique(array_merge(sfConfig::get('app_phirehose_follow',array()),$this->getFollows()))
+      array_unique(array_merge(sfConfig::get('app_phirehose_follow', array()), $this->getFollows()))
     );
   }
 

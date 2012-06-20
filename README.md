@@ -12,7 +12,7 @@ on lib/vendor:
 
 on plugins:
 
-    majaxPheanstalkPlugin https://github.com/benlancaster/majaxPheanstalkPlugin.git/trunk
+    majaxPheanstalkPlugin https://github.com/HollerLondon/majaxPheanstalkPlugin.git/trunk
 
 Global config
 -------------
@@ -36,15 +36,20 @@ Configuration
 -------------
 
      phirehose:
-       username:     # from twitter
-       password:
-       track:        [] # keywords to track - or use the DB table TwitterSearchPhrase
-       follow:       [] # users to follow
+       class:           myPhirehoseClass  # optional, must extend sfOauthPhirehose
+       consumer_key:    ~                 # from your twitter application
+       consumer_secret: ~
+       access_token:    ~                 # from the twitter application generate your own access token and secret
+       access_token_secret: ~
+       track:           []                # keywords to track - or use the DB table TwitterSearchPhrase (or custom implementation)
+       follow:          []                # users to follow
         
 To run
 ------
 
-     ./symfony pheanstalk:run_worker frontend TweetWorker log/beanstalk.log
+Run tasks (ideally via supervisor):
+
+     ./symfony pheanstalk:run_worker TweetWorker
      ./symfony twitter:stream
      
 Run streaming task as daemon

@@ -4,10 +4,6 @@ class phirehoseTask extends sfBaseTask
 {
   protected function configure()
   {
-    // // add your own arguments here
-    // $this->addArguments(array(
-    //   new sfCommandArgument('my_arg', sfCommandArgument::REQUIRED, 'My argument'),
-    // ));
     $this->addOptions(array(
       new sfCommandOption('application', null, sfCommandOption::PARAMETER_REQUIRED, 'The application name','backend'),
       new sfCommandOption('env', null, sfCommandOption::PARAMETER_REQUIRED, 'The environment', 'dev'),
@@ -17,9 +13,9 @@ class phirehoseTask extends sfBaseTask
 
     $this->namespace        = 'twitter';
     $this->name             = 'stream';
-    $this->briefDescription = 'Grabs tweets from Twitter Streaming API and saves in database';
+    $this->briefDescription = 'Grabs tweets from Twitter Streaming API, passes them to beanstalk and saves in database';
     $this->detailedDescription = <<<EOF
-The [stream|INFO] task grabs tweets from Twitter Streaming API, and saves in the database.
+The [stream|INFO] task grabs tweets from Twitter Streaming API, passes them to beanstalk and saves in the database.
 Call it with:
 
   [php symfony twitter:stream|INFO]
@@ -28,13 +24,14 @@ EOF;
   
   protected function execute($arguments = array(), $options = array())
   {
-    if($options['daemonize'])
+    if ($options['daemonize'])
     {
-      $this->logSection("Task","Attempting to Daemonise");
+      $this->logSection("Task", "Attempting to Daemonise");
       $this->executeAsDaemon($arguments,$options);
       return;
     }
-    $this->logSection("Task","Running in the foreground");
+    
+    $this->logSection("Task", "Running in the foreground");
     $this->doStuff($arguments,$options);
   }
 
@@ -51,25 +48,28 @@ EOF;
     $pid = pcntl_fork();
     if ($pid == -1)
     {
-      $this->logSection('Daemon','Failed to fork off');
+      $this->logSection('Daemon', 'Failed to fork off');
     }
-    elseif ($pid)
+    else if ($pid)
     {
-      $this->logSection('Daemon',sprintf("Spawned new stream process with pid %u",$pid));
+      $this->logSection('Daemon', sprintf("Spawned new stream process with pid %u", $pid));
       exit;
     }
     else 
     { // we are the child
       $this->doStuff($arguments,$options);
     }
+    
     // detatch from the controlling terminal
     if (posix_setsid() == -1)
     {
-      $this->logSection('Daemon','Could not detatch');
+      $this->logSection('Daemon', 'Could not detatch');
     }
+    
     // setup signal handlers
     pcntl_signal(SIGTERM, "sig_handler");
-    function sig_handler($signo) { if($signo == SIGTERM) exit(); }
+    
+    function sig_handler($signo) { if ($signo == SIGTERM) exit(); }
   }
 
   /**
@@ -83,32 +83,41 @@ EOF;
 
     // initialize the database connection
     $databaseManager = new sfDatabaseManager($this->configuration);
-    $connection = $databaseManager->getDatabase($options['connection'])->getConnection();
+    $connection      = $databaseManager->getDatabase($options['connection'])->getConnection();
     
     // This task doesn't actually do a whole lot. It's this class that really
-    // does the magic. The sfPhirehose class is an extension of the core
-    // Phirehose task. If you want to add your own logic for:
+    // does the magic. The sfOauthPhirehose class is an extension of the core
+    // OauthPhirehose task. If you want to add your own logic for:
     // - Fetching search terms
     // - Fetching users to follow
     // - Storing tweets
     // ... then this is the class to overload
-    $class_name = sfConfig::get('app_phirehose_class','sfPhirehose');
+    $class_name = sfConfig::get('app_phirehose_class', 'sfOauthPhirehose');
+    
+    // If we're using the old basic auth, lets not break the implementation
+    // Degrade to using deprecated class
+    if (is_null(sfConfig::get('app_phirehose_consumer_key')) && 'sfOauthPhirehose' == $class_name)
+    {
+      $class_name = 'sfPhirehose';
+    }
 
-    $this->logSection("DB","Established");
-    $this->logSection("Phirehose","Attempting to create Streaming API connection");
-    $this->logSection("Phirehose",sprintf("Connecting as %s using class %s",sfConfig::get('app_phirehose_username'),$class_name));
+    $this->logSection("DB", "Established");
+    $this->logSection("Phirehose", "Attempting to create Streaming API connection");
+    $this->logSection("Phirehose", sprintf("Connecting %s using class %s", 
+                                            (is_null(sfConfig::get('app_phirehose_username')) ? 'with oauth' : 'as ' . sfConfig::get('app_phirehose_username')), 
+                                            $class_name));
 
     $searcher = new $class_name(
-      sfConfig::get('app_phirehose_username'),
-      sfConfig::get('app_phirehose_password'),
+      sfConfig::get('app_phirehose_access_token', sfConfig::get('app_phirehose_username')),         # Username is access token for oauth
+      sfConfig::get('app_phirehose_access_token_secret', sfConfig::get('app_phirehose_password')),  # Password is the secret for oauth
       Phirehose::METHOD_FILTER
     );
     
-    $this->logSection("Phirehose","Streaming API connection established");
+    $this->logSection("Phirehose", "Streaming API connection established");
 
     // We pass the task back in to the sfPhirehose task so we can log stuff
     // from it and have it logged by the task. That sounds cyclical and probably
-    // doesn't make a lot of sense. Give a shit.
+    // doesn't make a lot of sense.
     $searcher->task = $this;
     $searcher->consume();
   }
@@ -118,22 +127,23 @@ EOF;
    */
   public function logSection($section, $message, $size = null, $style = 'INFO')
   {
-    if($section == 'Phirehose' && sfConfig::get('app_phirehose_log_purge',86400) > 0)
+    if ($section == 'Phirehose' && sfConfig::get('app_phirehose_log_purge', 86400) > 0)
     {
-      $l = new TaskLog;
+      $l            = new TaskLog;
       $l['message'] = $message;
       $l->save();
       $l->free(true);
       
-      $q = Doctrine::getTable('TaskLog')
-        ->createQuery('t')
-        ->delete()
-        ->where('t.created_at < ?',date('Y-m-d H:i:s',strtotime(sprintf("-%u second",sfConfig::get('app_phirehose_log_purge',86400)))));
+      $q = TaskLogTable::getInstance()
+                          ->createQuery('t')
+                          ->delete()
+                          ->where('t.created_at < ?', date('Y-m-d H:i:s', strtotime(sprintf("-%u second", sfConfig::get('app_phirehose_log_purge', 86400)))));
       
-      parent::logSection("debug","Purging logs older than ".date('Y-m-d H:i:s',strtotime(sprintf("-%u second",sfConfig::get('app_phirehose_log_purge',86400)))));
+      parent::logSection("debug", "Purging logs older than " . date('Y-m-d H:i:s', strtotime(sprintf("-%u second", sfConfig::get('app_phirehose_log_purge', 86400)))));
+      
       $q->execute();
-      
     }
-    return parent::logSection($section,$message,$size,$style);
+    
+    return parent::logSection($section, $message, $size, $style);
   }
 }

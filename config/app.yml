@@ -1,8 +1,12 @@
 all:
   phirehose:
-    class:        sfPhirehose
-    username:     ~ # Username of your Twitter account
-    password:     ~ # Password of your Twitter account
-    follow:       ~ # Array of numeric Twitter User IDs to follow
-    track:        ~ # Array of phrases to track (will get merged with any from TwitterSearchTerms)
-    log_purge:    86400 # time to keep log entries for, defaults to 1 day
+    class:            sfOauthPhirehose
+    consumer_key:     ~       # From your Twitter application
+    consumer_secret:  ~ 
+    access_token:     ~       # From the Twitter application generate your own access token and secret
+    access_token_secret: ~
+    username:         ~       # Username of your Twitter account (@deprecated in favour of oauth - leave blank)
+    password:         ~       # Password of your Twitter account (@deprecated in favour of oauth - leave blank)
+    follow:           ~       # Array of numeric Twitter User IDs to follow
+    track:            ~       # Array of phrases to track (will get merged with any from TwitterSearchTerms)
+    log_purge:        86400   # Time to keep log entries for, defaults to 1 day
