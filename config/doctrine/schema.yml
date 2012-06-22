@@ -107,6 +107,45 @@ TweetLink:
     link_id:                { type: integer, primary: true }
 
 
+Media:
+  options:
+    symfony:
+      form:   false
+      
+  columns:
+    id:                     { type: integer, unsigned: true, notnull: true, primary: true }
+    type:                   string(30)
+    media_url:              string   # append :thumb, :large, :medium, :small to end to get the different sizes, medium by default
+    media_url_https:        string
+    url:                    string
+    display_url:            string
+    expanded_url:           string
+    sizes:                  array(1000)
+    hash:                   { type: string(40), fixed: true }
+    
+  actAs:
+    Timestampable:
+      updated:              { disabled: true }
+      
+  indexes:
+    url_hash:
+      fields:               [ hash ]
+      type:                 unique
+    link_created_at:
+      fields:               [ created_at ]
+
+
+TweetMedia:
+  options:
+    symfony:
+      form:   false
+      filter: false
+      
+  columns:
+    tweet_id:               { type: integer, unsigned: true, notnull: true, fixed: true, primary: true }
+    media_id:               { type: integer, unsigned: true, notnull: true, primary: true }
+
+
 TweetSource:
   columns:
     source:                 text
@@ -177,6 +216,12 @@ Tweet:
       refClass:             TweetLink
       local:                tweet_id
       foreign:              link_id
+      onDelete:             cascade
+    Media:
+      class:                Media
+      refClass:             TweetMedia
+      local:                tweet_id
+      foreign:              media_id
       onDelete:             cascade
     RetweetedBy:
       class:                TwitterUserSkeleton

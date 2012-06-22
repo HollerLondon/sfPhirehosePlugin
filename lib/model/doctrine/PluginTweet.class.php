@@ -64,42 +64,48 @@ abstract class PluginTweet extends BaseTweet
       $mentions = array();
       
       // Mentions
-      foreach ($array['entities']['user_mentions'] as $usr)
+      if (isset($array['entities']['user_mentions']))
       {
-        $tw_usr = TwitterUserSkeletonTable::getInstance()->findOneById($usr->id) ?: new TwitterUserSkeleton();
-        $tw_usr->fromArray((array)$usr);
-        $tw_usr->save(); // need to save them incase they're also the author
-        
-        // Don't want to duplicate - throws unique index error
-        if (!in_array($usr->id, $mentions))
+        foreach ($array['entities']['user_mentions'] as $usr)
         {
-          $mentions[] = $usr->id;
-          $mentionned = TweetMentionTable::getInstance()->findOneByTweetIdAndFollowerId((int)$array['id'], $usr->id);
+          $tw_usr = TwitterUserSkeletonTable::getInstance()->findOneById($usr->id) ?: new TwitterUserSkeleton();
+          $tw_usr->fromArray((array)$usr);
+          $tw_usr->save(); // need to save them incase they're also the author
           
-          if (!$mentionned) $this['Mentions']->add($tw_usr);
+          // Don't want to duplicate - throws unique index error
+          if (!in_array($usr->id, $mentions))
+          {
+            $mentions[] = $usr->id;
+            $mentionned = TweetMentionTable::getInstance()->findOneByTweetIdAndFollowerId((int)$array['id'], $usr->id);
+            
+            if (!$mentionned) $this['Mentions']->add($tw_usr);
+          }
         }
       }
       
       // Hashtags
       $seen = array();
       
-      foreach ($array['entities']['hashtags'] as $ht)
+      if (isset($array['entities']['hashtags']))
       {
-        $normalised_ht = strtolower($ht->text);
-        
-        if (in_array($normalised_ht, $seen)) continue;
-        
-        $seen[]             = $normalised_ht;
-        $hashtag            = HashtagTable::getInstance()->findOneByHashtag($normalised_ht) ?: new Hashtag();
-        $hashtag['hashtag'] = $normalised_ht;
-        
-        if (!$hashtag->isNew())
+        foreach ($array['entities']['hashtags'] as $ht)
         {
-          $hashed = TweetHashtagTable::getInstance()->findOneByTweetIdAndHashtagId((int)$array['id'], $hashtag['id']);
-          if ($hashed) continue;
+          $normalised_ht = strtolower($ht->text);
+          
+          if (in_array($normalised_ht, $seen)) continue;
+          
+          $seen[]             = $normalised_ht;
+          $hashtag            = HashtagTable::getInstance()->findOneByHashtag($normalised_ht) ?: new Hashtag();
+          $hashtag['hashtag'] = $normalised_ht;
+          
+          if (!$hashtag->isNew())
+          {
+            $hashed = TweetHashtagTable::getInstance()->findOneByTweetIdAndHashtagId((int)$array['id'], $hashtag['id']);
+            if ($hashed) continue;
+          }
+          
+          $this['Hashtags']->add($hashtag);
         }
-        
-        $this['Hashtags']->add($hashtag);
       }
       
       // Source (aka Twitter client)
@@ -110,22 +116,55 @@ abstract class PluginTweet extends BaseTweet
       $this['Source'] = $source;
       
       // URLs in the tweet
-      foreach ($array['entities']['urls'] as $url)
+      if (isset($array['entities']['urls']))
       {
-        $link = LinkTable::getInstance()->findOneByUrl($url->url) ?: new Link();
-        
-        if ($link->isNew())
+        foreach ($array['entities']['urls'] as $url)
         {
-          $link->fromArray((array) $url); 
-          $link->save();
+          $link = LinkTable::getInstance()->findOneByUrl($url->url) ?: new Link();
+          
+          if ($link->isNew())
+          {
+            $link->fromArray((array) $url); 
+            $link->save();
+          }
+          else
+          {
+            $linked = TweetLinkTable::getInstance()->findOneByTweetIdAndLinkId((int)$array['id'], $link['id']);
+            if ($linked) continue;
+          }
+          
+          $this['URLs']->add($link);
         }
-        else
+      }
+      
+      // Media in the tweet (e:g uploaded photo via Twitter client)
+      if (isset($array['entities']['media']))
+      {
+        foreach ($array['entities']['media'] as $resource)
         {
-          $linked = TweetLinkTable::getInstance()->findOneByTweetIdAndLinkId((int)$array['id'], $link['id']);
-          if ($linked) continue;
+          $media = MediaTable::getInstance()->findOneByMediaUrl($resource->media_url) ?: new Media();
+          
+          if ($media->isNew())
+          {
+            $resource2 = (array) $resource;
+            $resource2['sizes'] = array(
+              'large' => (array) $resource->sizes->large,
+              'medium' => (array) $resource->sizes->medium,
+              'small' => (array) $resource->sizes->small,
+              'thumb' => (array) $resource->sizes->thumb,
+            );
+            
+            $media->fromArray($resource2); 
+            $media->save();
+          }
+          else
+          {
+            $linked = TweetMediaTable::getInstance()->findOneByTweetIdAndMediaId((int)$array['id'], $media['id']);
+            if ($linked) continue;
+          }
+          
+          $this['Media']->add($media);
         }
-        
-        $this['URLs']->add($link);
       }
     }
   }
