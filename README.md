@@ -43,6 +43,7 @@ Configuration
        access_token_secret: ~
        track:           []                # keywords to track - or use the DB table TwitterSearchPhrase (or custom implementation)
        follow:          []                # users to follow
+       tube:            tweets            # If multiple streams per server - change the tube
         
 To run
 ------
