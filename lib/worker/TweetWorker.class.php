@@ -12,7 +12,7 @@ class TweetWorker extends majaxPheanstalkWorkerThread
 {
   public function doRun()
   {
-    $job = $this->getJob('tweets');
+    $job = $this->getJob(sfConfig::get('app_phirehose_tube', 'tweets'));
     
     if (!$job)
     {

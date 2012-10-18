@@ -104,7 +104,7 @@ class sfPhirehose extends Phirehose
     {
       // Let beanstalk handle this work
       $pheanstalk = majaxPheanstalk::getInstance();
-      $pheanstalk->useTube('tweets')->put($raw);
+      $pheanstalk->useTube(sfConfig::get('app_phirehose_tube', 'tweets'))->put($raw);
     }
   }
 

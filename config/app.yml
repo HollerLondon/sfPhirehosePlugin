@@ -10,3 +10,4 @@ all:
     follow:           ~       # Array of numeric Twitter User IDs to follow
     track:            ~       # Array of phrases to track (will get merged with any from TwitterSearchTerms)
     log_purge:        86400   # Time to keep log entries for, defaults to 1 day
+    tube:             tweets  # If multiple streams per server - change the tube
