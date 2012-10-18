@@ -48,11 +48,13 @@ Configuration
 To run
 ------
 
+Run tasks as backend in case of moderation (and obv prod when live)
+
 Run tasks (ideally via supervisor):
 
-     ./symfony pheanstalk:run_worker TweetWorker
-     ./symfony twitter:stream
+     ./symfony pheanstalk:run_worker TweetWorker --env=prod --env=backend
+     ./symfony twitter:stream --env=prod --env=backend
      
 Run streaming task as daemon
 
-      ./symfony twitter:stream -d
+      ./symfony twitter:stream -d  --env=prod --env=backend
