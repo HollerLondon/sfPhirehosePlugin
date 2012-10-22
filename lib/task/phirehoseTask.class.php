@@ -114,6 +114,7 @@ EOF;
     );
     
     $this->logSection("Phirehose", "Streaming API connection established");
+    $this->logSection('Phirehose', 'Using tube: '.sfConfig::get('app_phirehose_tube', 'tweets'));
 
     // We pass the task back in to the sfPhirehose task so we can log stuff
     // from it and have it logged by the task. That sounds cyclical and probably
