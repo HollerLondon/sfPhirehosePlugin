@@ -12,5 +12,8 @@
  */
 abstract class PluginTwitterUserSkeleton extends BaseTwitterUserSkeleton
 {
-
+  public function __toString()
+  {
+    return sprintf('%s (@%s)', $this->name, $this->screen_name);
+  }
 }
